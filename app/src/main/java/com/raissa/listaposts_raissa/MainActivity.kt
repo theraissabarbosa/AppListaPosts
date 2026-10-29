@@ -12,15 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import com.raissa.listaposts_raissa.ui.theme.ListaPosts_RaissaTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.net.URL
@@ -56,12 +61,13 @@ class MainActivity : ComponentActivity() {
 }
 
 // ---------- Tela: carrega, mostra erro ou mostra a lista ----------
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostListPage() {
     var posts by remember { mutableStateOf<List<PostListItem>?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val isLoading = posts == null && errorMessage == null
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         try {
@@ -71,7 +77,35 @@ fun PostListPage() {
         }
     }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text("Posts") },
+                actions = {
+                    TextButton(
+                        // se isloading for falso, botão retry fica cinza, nao deixa carregar
+                        enabled = !isLoading,
+                        onClick = {
+                            scope.launch {
+                                posts = null
+                                errorMessage = null
+                                try {
+                                    posts = downloadPosts()
+                                } catch (e: Exception) {
+                                    errorMessage = "Algo deu errado"
+                                }
+                            }
+                        }
+                    ){
+                        Text("Retry")
+                    }
+                }
+            )
+        }
+
+    ) { innerPadding ->
+        val errorMessageSnapshot = errorMessage
         when {
             isLoading -> Box(
                 Modifier.fillMaxSize(),
@@ -80,10 +114,10 @@ fun PostListPage() {
                 CircularProgressIndicator()
             }
 
-            errorMessage != null -> Box(
+            errorMessageSnapshot != null -> Box(
                 Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
-            ) { Text(errorMessage!!) }
+            ) { Text(errorMessageSnapshot) }
 
             else -> LazyColumn(
                 Modifier
