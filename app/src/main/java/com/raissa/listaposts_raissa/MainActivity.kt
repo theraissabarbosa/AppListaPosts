@@ -1,9 +1,11 @@
 package com.raissa.listaposts_raissa
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.raissa.listaposts_raissa.ui.theme.ListaPosts_RaissaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.net.URL
@@ -51,10 +54,16 @@ data class PostListItem(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+
         enableEdgeToEdge()
         setContent {
             ListaPosts_RaissaTheme {
-                PostListPage()
+                PostListPage {
+                    val intent = Intent(this, PostDetailActivity::class.java)
+                    intent.putExtra("post_id", it.postId)
+                    startActivity(intent)
+                }
             }
         }
     }
@@ -63,7 +72,7 @@ class MainActivity : ComponentActivity() {
 // ---------- Tela: carrega, mostra erro ou mostra a lista ----------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostListPage() {
+fun PostListPage(onPostClick: (PostListItem) -> Unit) {
     var posts by remember { mutableStateOf<List<PostListItem>?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val isLoading = posts == null && errorMessage == null
@@ -125,7 +134,10 @@ fun PostListPage() {
                     .padding(paddingValues = innerPadding)
             ) {
                 items(posts ?: emptyList(), key = { it.postId }) {
-                    PostListTile(it)
+                    PostListTile(it){
+                        onPostClick(it)
+                    }
+
                 }
             }
         }
@@ -135,8 +147,8 @@ fun PostListPage() {
 // ---------- Item da lista ----------
 
 @Composable
-fun PostListTile(post: PostListItem) {
-    Column(Modifier.fillMaxWidth()) {
+fun PostListTile(post: PostListItem, onClick: ()-> Unit) {
+    Column(Modifier.fillMaxWidth().clickable{ onClick()}) {
         Text(
             "User ID: ${post.userId} • Post #${post.postId}",
             style = MaterialTheme.typography.labelSmall
@@ -183,7 +195,9 @@ fun PostListTilePreview() {
                 description = "Texto de exemplo do post, só para visualizar o item da lista.",
                 userId = "1",
                 postId = "1"
-            )
+            ),
+            onClick = {}
         )
     }
 }
+
