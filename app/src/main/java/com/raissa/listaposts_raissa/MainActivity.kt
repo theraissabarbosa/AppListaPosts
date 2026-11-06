@@ -73,16 +73,22 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostListPage(onPostClick: (PostListItem) -> Unit) {
-    var posts by remember { mutableStateOf<List<PostListItem>?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val isLoading = posts == null && errorMessage == null
+    var state by remember { mutableStateOf<SuspendState<List<PostListItem>>>(LoadingState()) }
+    val isLoading = state is LoadingState
     val scope = rememberCoroutineScope()
 
+
+    // esse treco usa como parametro UNIT pois só vai rodar UMA VEZ -> UNIT é constante
+    // é como se fosse efeito colateral
     LaunchedEffect(Unit) {
-        try {
-            posts = downloadPosts()
-        } catch (e: Exception) {
-            errorMessage = "Algo deu errado"
+        state = try {
+            SuccessState(
+                data = downloadPosts()
+            )
+        } catch (_: Exception) {
+            ErrorState(
+                message = "não foi possivel carregar fi"
+            )
         }
     }
 
@@ -94,15 +100,15 @@ fun PostListPage(onPostClick: (PostListItem) -> Unit) {
                 actions = {
                     TextButton(
                         // se isloading for falso, botão retry fica cinza, nao deixa carregar
+                        // só ENABLE se NÃO tiver carregando
                         enabled = !isLoading,
                         onClick = {
                             scope.launch {
-                                posts = null
-                                errorMessage = null
-                                try {
-                                    posts = downloadPosts()
+                                state = LoadingState()
+                                state = try {
+                                    SuccessState(downloadPosts())
                                 } catch (e: Exception) {
-                                    errorMessage = "Algo deu errado"
+                                    ErrorState(message = "Algo deu errado")
                                 }
                             }
                         }
@@ -114,33 +120,40 @@ fun PostListPage(onPostClick: (PostListItem) -> Unit) {
         }
 
     ) { innerPadding ->
-        val errorMessageSnapshot = errorMessage
-        when {
-            isLoading -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
+        when (val state = state){
+            // se der erro, mensagem
+            is ErrorState -> {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) { Text(state.message) }
             }
+            // se fro loading, mostra a bolinha carregando
+            is LoadingState -> {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+            is SuccessState -> {
+                LazyColumn(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(paddingValues = innerPadding)
+                ) {
+                    items(state.data, key = { it.postId }) { post ->
+                        PostListTile(post){
+                            onPostClick(post)
+                        }
 
-            errorMessageSnapshot != null -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) { Text(errorMessageSnapshot) }
-
-            else -> LazyColumn(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(paddingValues = innerPadding)
-            ) {
-                items(posts ?: emptyList(), key = { it.postId }) {
-                    PostListTile(it){
-                        onPostClick(it)
                     }
-
                 }
             }
         }
+
+
     }
 }
 
@@ -148,7 +161,9 @@ fun PostListPage(onPostClick: (PostListItem) -> Unit) {
 
 @Composable
 fun PostListTile(post: PostListItem, onClick: ()-> Unit) {
-    Column(Modifier.fillMaxWidth().clickable{ onClick()}) {
+    Column(Modifier
+        .fillMaxWidth()
+        .clickable { onClick() }) {
         Text(
             "User ID: ${post.userId} • Post #${post.postId}",
             style = MaterialTheme.typography.labelSmall
