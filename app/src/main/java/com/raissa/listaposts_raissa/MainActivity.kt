@@ -37,10 +37,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.json.JSONArray
 import java.net.URL
 
 // ---------- Modelo de dados ----------
+@Serializable
+data class JSONPlaceHolderPostLstItem(
+    val id: Int,
+    val userId: Int,
+    val title: String,
+    val body: String,
+){
+    fun toPostListItem(): PostListItem{
+        return PostListItem(
+            title = title,
+            description = body,
+            userId = userId.toString(),
+            postId = id.toString()
+        )
+    }
+}
 
 data class PostListItem(
     val title: String,
@@ -185,17 +203,8 @@ fun PostListTile(post: PostListItem, onClick: ()-> Unit) {
 // ---------- Download dos posts (JSON) ----------
 
 suspend fun downloadPosts(): List<PostListItem> = withContext(Dispatchers.IO) {
-    val jsonResponse = URL("https://jsonplaceholder.typicode.com/posts").readText()
-    val jsonList = JSONArray(jsonResponse)
-    List(jsonList.length()) { index ->
-        val jsonItem = jsonList.getJSONObject(index)
-        PostListItem(
-            title = jsonItem.get("title") as String,
-            description = jsonItem.getString("body"),
-            userId = jsonItem.getInt("userId").toString(),
-            postId = jsonItem.getInt("id").toString()
-        )
-    }
+    val jsonText = URL("https://jsonplaceholder.typicode.com/posts").readText()
+    Json.decodeFromString<List<JSONPlaceHolderPostLstItem>>(jsonText).map {it.toPostListItem()}
 }
 
 // ---------- Preview ----------
@@ -216,3 +225,4 @@ fun PostListTilePreview() {
     }
 }
 
+// modelos da api
