@@ -1,4 +1,4 @@
-package com.raissa.listaposts_raissa
+package com.raissa.listaposts_raissa.models
 
 // SuccessDataType tipo GENERICO - voce define depois
 // OUT = só produz do tipo (IN seria somente consumo | se não colocar nada = aceita os dois)

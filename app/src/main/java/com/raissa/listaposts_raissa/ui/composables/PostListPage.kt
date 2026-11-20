@@ -1,0 +1,159 @@
+package com.raissa.listaposts_raissa.ui.composables
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import com.raissa.listaposts_raissa.jsonplaceholder.JSONPlaceholder
+import com.raissa.listaposts_raissa.models.ErrorState
+import com.raissa.listaposts_raissa.models.LoadingState
+import com.raissa.listaposts_raissa.models.PostListItem
+import com.raissa.listaposts_raissa.models.SuccessState
+import com.raissa.listaposts_raissa.models.SuspendState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import java.net.URL
+
+// ---------- Tela: carrega, mostra erro ou mostra a lista ----------
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PostListPage(onPostClick: (PostListItem) -> Unit) {
+    var state by remember { mutableStateOf<SuspendState<List<PostListItem>>>(LoadingState()) }
+    val isLoading = state is LoadingState
+    val scope = rememberCoroutineScope()
+
+
+    // esse treco usa como parametro UNIT pois só vai rodar UMA VEZ -> UNIT é constante
+    // é como se fosse efeito colateral
+    LaunchedEffect(Unit) {
+        state = try {
+            SuccessState(
+                data = downloadPosts()
+            )
+        } catch (_: Exception) {
+            ErrorState(
+                message = "não foi possivel carregar fi"
+            )
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text("Posts") },
+                actions = {
+                    TextButton(
+                        // se isloading for falso, botão retry fica cinza, nao deixa carregar
+                        // só ENABLE se NÃO tiver carregando
+                        enabled = !isLoading,
+                        onClick = {
+                            scope.launch {
+                                state = LoadingState()
+                                state = try {
+                                    SuccessState(downloadPosts())
+                                } catch (e: Exception) {
+                                    ErrorState(message = "Algo deu errado")
+                                }
+                            }
+                        }
+                    ){
+                        Text("Retry")
+                    }
+                }
+            )
+        }
+
+    ) { innerPadding ->
+        when (val state = state){
+            // se der erro, mensagem
+            is ErrorState -> {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) { Text(state.message) }
+            }
+            // se fro loading, mostra a bolinha carregando
+            is LoadingState -> {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+            is SuccessState -> {
+                LazyColumn(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(paddingValues = innerPadding)
+                ) {
+                    items(state.data, key = { it.postId }) { post ->
+                        PostListTile(post){
+                            onPostClick(post)
+                        }
+
+                    }
+                }
+            }
+        }
+
+
+    }
+}
+
+// ---------- Item da lista ----------
+
+@Composable
+fun PostListTile(post: PostListItem, onClick: ()-> Unit) {
+    Column(Modifier
+        .fillMaxWidth()
+        .clickable { onClick() }) {
+        Text(
+            "User ID: ${post.userId} • Post #${post.postId}",
+            style = MaterialTheme.typography.labelSmall
+        )
+        Text(
+            post.title,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Text(
+            post.description,
+            maxLines = 3
+        )
+
+        HorizontalDivider(Modifier)
+    }
+}
+
+// ---------- Download dos posts (JSON) ----------
+
+suspend fun downloadPosts(): List<PostListItem> = withContext(Dispatchers.IO) {
+    val jsonText = URL("https://jsonplaceholder.typicode.com/posts").readText()
+    Json.decodeFromString<List< JSONPlaceholder.PostLstItem>>(jsonText).map {it.toPostListItem()}
+}

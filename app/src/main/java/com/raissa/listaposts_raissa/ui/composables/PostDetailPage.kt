@@ -1,54 +1,38 @@
-package com.raissa.listaposts_raissa
+package com.raissa.listaposts_raissa.ui.composables
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Badge
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.raissa.listaposts_raissa.ui.theme.ListaPosts_RaissaTheme
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.raissa.listaposts_raissa.jsonplaceholder.JSONPlaceholder
+import com.raissa.listaposts_raissa.models.ErrorState
+import com.raissa.listaposts_raissa.models.LoadingState
+import com.raissa.listaposts_raissa.models.PostDetail
+import com.raissa.listaposts_raissa.models.SuccessState
+import com.raissa.listaposts_raissa.models.SuspendState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import org.json.JSONArray
-import org.json.JSONObject
 import java.net.URL
-
-class PostDetailActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val postId = intent.getStringExtra("post_id")
-        enableEdgeToEdge()
-        setContent {
-            ListaPosts_RaissaTheme {
-                PostDetailPage(postId ?: "")
-            }
-        }
-    }
-}
-
 
 @Composable
 fun PostDetailPage(postId: String) {
@@ -136,43 +120,15 @@ fun PostDetailPage(postId: String) {
     }
 }
 
-// modelos do app
-data class PostDetail(
-    val id: String,
-    val title: String,
-    val body: String,
-    val comments: List<PostDetailComment>
-)
 
-data class PostDetailComment(
-    val id: String,
-    val title: String,
-    val commenterEmail: String,
-    val body: String,
-)
 
-// modelos da api (dto)
-@Serializable
-data class APIPostDetail(
-    val id: Int,
-    val userId: Int,
-    val title: String,
-    val body: String,
-)
-@Serializable
-data class APIPostDetailComment(
-    val id: Int,
-    val postId: Int,
-    val name: String,
-    val email: String,
-    val body: String,
-)
+
 
 
 private suspend fun fetchData(postId: String): PostDetail = withContext(Dispatchers.IO) {
     require(postId.toIntOrNull() != null) { "Invalid postId" }
     val jsonText = URL("https://jsonplaceholder.typicode.com/posts/$postId").readText()
-    val apiPostDetail = Json.decodeFromString<APIPostDetail>(jsonText)
+    val apiPostDetail = Json.decodeFromString<JSONPlaceholder.PostDetail>(jsonText)
     PostDetail(
         id = apiPostDetail.id.toString(),
         title = apiPostDetail.title,
@@ -182,19 +138,13 @@ private suspend fun fetchData(postId: String): PostDetail = withContext(Dispatch
 
 }
 
-private suspend fun fetchComments(postId: String): List<PostDetailComment> =
+private suspend fun fetchComments(postId: String): List<PostDetail.Comment> =
     withContext(Dispatchers.IO) {
         require(postId.toIntOrNull() != null) { "Invalid postId" }
         val jsonText = URL("https://jsonplaceholder.typicode.com/posts/$postId/comments").readText()
-        Json.decodeFromString<List<APIPostDetailComment>>(jsonText).map {
-            PostDetailComment(
-                id = it.id.toString(),
-                title = it.name,
-                commenterEmail = it.email,
-                body = it.body
-            )
+        Json.decodeFromString<List<JSONPlaceholder.PostDetailComment>>(jsonText).map {
+            it.toComment()
         }
 
 
     }
-
